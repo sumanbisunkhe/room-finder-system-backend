@@ -7,7 +7,6 @@ Version 1.0
 2. [Backend Structure](#2-backend-structure)
 3. [Frontend Structure](#3-frontend-structure)
 4. [Application Properties](#4-application-properties)
-5. [Initial Setup Guide](#5-initial-setup-guide)
 
 ## 1. Introduction
 Room Finder System is a web application built using Spring Boot and React. The project follows a modular architecture with clear separation of concerns.
