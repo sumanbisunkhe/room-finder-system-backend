@@ -2,6 +2,7 @@ package com.roomfinder.service.impl;
 
 import com.roomfinder.dto.request.RegisterRequest;
 import com.roomfinder.dto.request.UpdateProfileRequest;
+import com.roomfinder.dto.request.ValidateUsersRequest;
 import com.roomfinder.entity.User;
 import com.roomfinder.enums.UserRole;
 import com.roomfinder.exceptions.UserNotFoundException;
@@ -190,6 +191,17 @@ public class UserServiceImpl implements UserService {
     @Override
     public Optional<User> getUserByEmail(String email) {
         return Optional.ofNullable(userRepository.findByEmail(email));
+    }
+
+    @Override
+    public ValidateUsersRequest getUserById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User with ID " + userId + " not found"));
+
+        return ValidateUsersRequest.builder()
+                .userId(user.getId())
+                .role(user.getRole().name())
+                .build();
     }
 
 }

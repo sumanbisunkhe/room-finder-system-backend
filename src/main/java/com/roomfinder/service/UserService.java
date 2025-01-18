@@ -2,6 +2,7 @@ package com.roomfinder.service;
 
 import com.roomfinder.dto.request.RegisterRequest;
 import com.roomfinder.dto.request.UpdateProfileRequest;
+import com.roomfinder.dto.request.ValidateUsersRequest;
 import com.roomfinder.entity.User;
 
 import java.util.List;
@@ -24,4 +25,6 @@ public interface UserService {
 
     Optional<User> getUserByUsername(String username);
     Optional<User> getUserByEmail(String email);
+
+    ValidateUsersRequest getUserById(Long senderId);
 }
