@@ -30,10 +30,33 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiResponse> handleResourceNotFound(ResourceNotFoundException ex) {
+        ApiResponse response = new ApiResponse(false, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(ValidationException.class)
+    public ResponseEntity<ApiResponse> handleValidationException(ValidationException ex) {
+        ApiResponse response = new ApiResponse(false, ex.getMessage());
+        return ResponseEntity.badRequest().body(response);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse> handleIllegalArgument(IllegalArgumentException ex) {
         ApiResponse response = new ApiResponse(false, ex.getMessage());
         return ResponseEntity.badRequest().body(response);
+    }
+    @ExceptionHandler(InvalidBookingException.class)
+    public ResponseEntity<ApiResponse> handleInvalidBooking(InvalidBookingException ex) {
+        ApiResponse response = new ApiResponse(false, ex.getMessage());
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(BookingNotFoundException.class)
+    public ResponseEntity<ApiResponse> handleBookingNotFound(BookingNotFoundException ex) {
+        ApiResponse response = new ApiResponse(false, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
     @ExceptionHandler(Exception.class)

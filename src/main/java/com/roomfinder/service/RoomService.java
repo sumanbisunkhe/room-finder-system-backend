@@ -14,4 +14,7 @@ public interface RoomService {
     List<Room> searchRooms(String city, Double maxPrice, String address);
     void toggleAvailability(Long roomId);
     String saveImage(MultipartFile file);
+    boolean isRoomOwner(Long roomId, Long landlordId);
+    Long getRoomOwnerId(Long roomId);
+
 }

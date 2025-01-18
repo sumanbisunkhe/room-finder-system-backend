@@ -1,7 +1,6 @@
 package com.roomfinder.security;
 
 import com.roomfinder.enums.UserRole;
-import com.roomfinder.util.CustomUserDetailsService;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

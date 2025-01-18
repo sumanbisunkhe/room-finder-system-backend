@@ -39,6 +39,23 @@ public class SecurityConfig {
                                 "/api/users/register",
                                 "/api/auth/login"
                         ).permitAll()
+
+                        .requestMatchers(
+                                "/api/bookings/{id}/approve",
+                                "/api/bookings/{id}/reject"
+                        ).hasRole("LANDLORD")
+
+                        .requestMatchers(
+                                "/api/bookings",
+                                "/api/bookings/{id}/cancel"
+                        ).hasRole("SEEKER")
+
+                        .requestMatchers(
+                                "/api/bookings/{id}",
+                                "/api/bookings/room/{roomId}",
+                                "/api/bookings/room/{roomId}/pending"
+                        ).hasAnyRole("LANDLORD", "SEEKER")
+
                         .requestMatchers(
                                 "/api/users",
                                 "/api/users/admins",

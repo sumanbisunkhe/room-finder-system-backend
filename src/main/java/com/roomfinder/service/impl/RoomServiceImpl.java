@@ -2,6 +2,7 @@ package com.roomfinder.service.impl;
 
 import com.roomfinder.dto.request.RoomRequest;
 import com.roomfinder.entity.Room;
+import com.roomfinder.exceptions.ResourceNotFoundException;
 import com.roomfinder.exceptions.RoomNotFoundException;
 import com.roomfinder.exceptions.UnauthorizedAccessException;
 import com.roomfinder.repository.RoomRepository;
@@ -146,6 +147,18 @@ public class RoomServiceImpl implements RoomService {
         } catch (IOException e) {
             throw new RuntimeException("Failed to store file", e);
         }
+    }
+
+    @Override
+    public boolean isRoomOwner(Long roomId, Long landlordId) {
+        return roomRepository.findByIdAndLandlordId(roomId, landlordId).isPresent();
+    }
+
+    @Override
+    public Long getRoomOwnerId(Long roomId) {
+        return roomRepository.findById(roomId)
+                .map(Room::getLandlordId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + roomId));
     }
 
     private void updateRoomFromRequest(Room room, RoomRequest request) {

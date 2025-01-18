@@ -4,6 +4,7 @@ import com.roomfinder.entity.Room;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import java.util.List;
+import java.util.Optional;
 
 public interface RoomRepository extends JpaRepository<Room, Long> {
     List<Room> findByLandlordId(Long landlordId);
@@ -16,4 +17,5 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
             "LENGTH(r.address) - LENGTH(REPLACE(r.address, :address, '')) DESC")
     List<Room> findRoomsBySimilarAddress(String address);
 
+    Optional<Room> findByIdAndLandlordId(Long id, Long landlordId);
 }

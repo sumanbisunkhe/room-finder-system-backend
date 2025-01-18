@@ -1,4 +1,4 @@
-package com.roomfinder.util;
+package com.roomfinder.security;
 
 import com.roomfinder.entity.User;
 import com.roomfinder.repository.UserRepository;
@@ -41,18 +41,18 @@ public class CustomUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("User account is not active: " + identifier);
         }
 
-        // Convert User entity to Spring Security UserDetails
-        return org.springframework.security.core.userdetails.User
-                .builder()
-                .username(user.getUsername())
-                .password(user.getPassword())
-                .authorities(Collections.singletonList(
+        // Convert User entity to CustomUserDetails
+        return new CustomUserDetails(
+                user.getUsername(),
+                user.getPassword(),
+                user.isActive(),  // enabled
+                user.isActive(),  // accountNonExpired
+                true,            // credentialsNonExpired
+                user.isActive(), // accountNonLocked
+                Collections.singletonList(
                         new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
-                ))
-                .accountExpired(!user.isActive())
-                .accountLocked(!user.isActive())
-                .credentialsExpired(false)
-                .disabled(!user.isActive())
-                .build();
+                ),
+                user.getId()
+        );
     }
 }
