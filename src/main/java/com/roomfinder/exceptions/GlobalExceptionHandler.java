@@ -64,4 +64,19 @@ public class GlobalExceptionHandler {
         ApiResponse response = new ApiResponse(false, "An unexpected error occurred: " + ex.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
+
+    @ExceptionHandler(RoomNotFoundException.class)
+    public ResponseEntity<ApiResponse> handleRoomNotFound(RoomNotFoundException ex) {
+        ApiResponse response = new ApiResponse(false, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+
+    @ExceptionHandler(UnauthorizedAccessException.class)
+    public ResponseEntity<ApiResponse> handleUnauthorizedAccess(UnauthorizedAccessException ex) {
+        ApiResponse response = new ApiResponse(false, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+
 }
