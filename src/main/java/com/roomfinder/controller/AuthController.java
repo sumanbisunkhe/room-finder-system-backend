@@ -8,6 +8,8 @@ import com.roomfinder.entity.User;
 import com.roomfinder.enums.UserRole;
 import com.roomfinder.security.JwtUtil;
 import com.roomfinder.service.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import java.util.Collections;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
@@ -35,10 +38,15 @@ public class AuthController {
     @Autowired
     private UserService userService;
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+
+
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
         try {
-            // Authenticate the user
+            // Log login attempt
+            logger.info("Login attempt for identifier: {}", loginRequest.getIdentifier());
+
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             loginRequest.getIdentifier(),
@@ -46,29 +54,36 @@ public class AuthController {
                     )
             );
 
-            // Set the authentication in SecurityContext
+            // Log successful authentication details
+            logger.info("Authentication successful for: {}", authentication.getName());
+            logger.info("User authorities: {}", authentication.getAuthorities());
+
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // Generate JWT token
+            List<UserRole> userRoles = authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .map(role -> role.replace("ROLE_", ""))
+                    .map(UserRole::valueOf)
+                    .collect(Collectors.toList());
+
             String jwt = jwtUtil.generateToken(
                     authentication.getName(),
-                    authentication.getAuthorities().stream()
-                            .map(GrantedAuthority::getAuthority)
-                            .map(role -> role.startsWith("ROLE_") ? role.substring(5) : role)
-                            .map(UserRole::valueOf)
-                            .collect(Collectors.toList())
+                    userRoles
             );
 
-            // Return the JWT token
+            // Log token generation
+            logger.info("JWT generated for user: {}", authentication.getName());
+
             return ResponseEntity.ok(new JwtResponse(jwt));
 
         } catch (Exception e) {
+            // Detailed error logging
+            logger.error("Login error for identifier: {}", loginRequest.getIdentifier(), e);
             return ResponseEntity
                     .badRequest()
                     .body(new MessageResponse("Error: Invalid username or password"));
         }
     }
-
     @GetMapping("/validate")
     public ResponseEntity<?> validateToken(@RequestHeader("Authorization") String token) {
         try {

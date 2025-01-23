@@ -102,6 +102,130 @@ room-finder-system/
 
 ## 3. Frontend Structure
 
+```
+    room-finder-frontend/
+    ├── .env
+    ├── .gitignore
+    ├── index.html
+    ├── package.json
+    ├── README.md
+    ├── vite.config.js
+    └── src/
+    ├── assets/
+    │   ├── images/
+    │   └── icons/
+    ├── config/
+    │   ├── axios.config.js
+    │   ├── routes.config.js
+    │   └── constants.js
+    ├── components/
+    │   ├── auth/
+    │   │   ├── LoginForm.jsx
+    │   │   ├── RegisterForm.jsx
+    │   │   └── PasswordResetForm.jsx
+    │   ├── booking/
+    │   │   ├── BookingForm.jsx
+    │   │   ├── BookingList.jsx
+    │   │   └── BookingCard.jsx
+    │   ├── common/
+    │   │   ├── Button.jsx
+    │   │   ├── Input.jsx
+    │   │   ├── Modal.jsx
+    │   │   ├── Spinner.jsx
+    │   │   └── Toast.jsx
+    │   ├── message/
+    │   │   ├── MessageList.jsx
+    │   │   ├── MessageItem.jsx
+    │   │   └── MessageForm.jsx
+    │   ├── room/
+    │   │   ├── RoomList.jsx
+    │   │   ├── RoomCard.jsx
+    │   │   ├── RoomForm.jsx
+    │   │   └── RoomDetails.jsx
+    │   └── user/
+    │       ├── UserProfile.jsx
+    │       └── UserSettings.jsx
+    ├── dto/
+    │   ├── request/
+    │   │   ├── BookingRequest.js
+    │   │   ├── LoginRequest.js
+    │   │   ├── MessageRequest.js
+    │   │   ├── PasswordChangeRequest.js
+    │   │   ├── RegisterRequest.js
+    │   │   ├── RoomRequest.js
+    │   │   └── UpdateProfileRequest.js
+    │   └── response/
+    │       ├── ApiResponse.js
+    │       ├── JwtResponse.js
+    │       └── MessageResponse.js
+    ├── enums/
+    │   ├── BookingStatus.js
+    │   └── UserRole.js
+    ├── hooks/
+    │   ├── useAuth.js
+    │   ├── useBooking.js
+    │   ├── useMessage.js
+    │   ├── useRoom.js
+    │   └── useUser.js
+    ├── layouts/
+    │   ├── AuthLayout.jsx
+    │   ├── DashboardLayout.jsx
+    │   └── MainLayout.jsx
+    ├── pages/
+    │   ├── auth/
+    │   │   ├── LoginPage.jsx
+    │   │   ├── RegisterPage.jsx
+    │   │   └── ResetPasswordPage.jsx
+    │   ├── booking/
+    │   │   ├── BookingListPage.jsx
+    │   │   └── BookingDetailsPage.jsx
+    │   ├── error/
+    │   │   ├── NotFoundPage.jsx
+    │   │   └── ErrorPage.jsx
+    │   ├── message/
+    │   │   ├── MessageListPage.jsx
+    │   │   └── ConversationPage.jsx
+    │   ├── room/
+    │   │   ├── RoomListPage.jsx
+    │   │   ├── RoomDetailsPage.jsx
+    │   │   └── AddRoomPage.jsx
+    │   └── user/
+    │       ├── ProfilePage.jsx
+    │       └── SettingsPage.jsx
+    ├── services/
+    │   ├── api/
+    │   │   ├── authApi.js
+    │   │   ├── bookingApi.js
+    │   │   ├── messageApi.js
+    │   │   ├── roomApi.js
+    │   │   └── userApi.js
+    │   └── http/
+    │       └── axios.js
+    ├── store/
+    │   ├── slices/
+    │   │   ├── authSlice.js
+    │   │   ├── bookingSlice.js
+    │   │   ├── messageSlice.js
+    │   │   ├── roomSlice.js
+    │   │   └── userSlice.js
+    │   └── store.js
+    ├── styles/
+    │   ├── components/
+    │   │   ├── auth.css
+    │   │   ├── booking.css
+    │   │   ├── message.css
+    │   │   ├── room.css
+    │   │   └── user.css
+    │   ├── index.css
+    │   └── variables.css
+    ├── utils/
+    │   ├── formatters.js
+    │   ├── validators.js
+    │   └── helpers.js
+    ├── App.jsx
+    └── main.jsx
+```
+
 
 ## 4. Application Properties
 
