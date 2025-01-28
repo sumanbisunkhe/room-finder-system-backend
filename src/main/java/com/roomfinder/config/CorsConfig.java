@@ -6,6 +6,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
+import java.util.List;
+
 @Configuration
 public class CorsConfig {
 
@@ -14,27 +16,29 @@ public class CorsConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
-        // Allow specific origin
-        config.addAllowedOrigin("http://localhost:5173");
+        // Allow specific origins (frontend URLs)
+        config.setAllowedOrigins(List.of("http://localhost:5173", "http://127.0.0.1:5173")); // Add more origins if needed
 
-        // Allow credentials
+        // Allow credentials (cookies, authorization headers)
         config.setAllowCredentials(true);
 
         // Allow specific headers
-        config.addExposedHeader("Authorization");
-        config.addAllowedHeader("Content-Type");
-        config.addAllowedHeader("Accept");
-        config.addAllowedHeader("Origin");
+        config.setAllowedHeaders(List.of(
+                "Authorization", "Content-Type", "Accept", "X-Requested-With", "Cache-Control"
+        ));
 
-        // Allow specific methods
-        config.addAllowedMethod("GET");
-        config.addAllowedMethod("POST");
-        config.addAllowedMethod("PUT");
-        config.addAllowedMethod("DELETE");
-        config.addAllowedMethod("OPTIONS");
+        // Expose specific headers to the frontend
+        config.setExposedHeaders(List.of(
+                "Authorization", "Content-Disposition"
+        ));
 
-        // Add route pattern
-        source.registerCorsConfiguration("/api/**", config);
+        // Allow specific HTTP methods
+        config.setAllowedMethods(List.of(
+                "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
+        ));
+
+        // Apply this configuration to all endpoints
+        source.registerCorsConfiguration("/**", config);
 
         return new CorsFilter(source);
     }

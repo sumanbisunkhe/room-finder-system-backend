@@ -4,6 +4,7 @@ import com.roomfinder.enums.UserRole;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -41,36 +42,54 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
-        final String requestTokenHeader = request.getHeader("Authorization");
-        String username = null;
-        String jwtToken = null;
-
         String requestURI = request.getRequestURI();
+
+        // Skip authentication for public endpoints
         if (isPublicEndpoint(requestURI)) {
             chain.doFilter(request, response);
             return;
         }
 
+        String jwtToken = null;
+        String requestTokenHeader = request.getHeader("Authorization");
+
+        // Check for token in Authorization header
         if (requestTokenHeader != null && requestTokenHeader.startsWith("Bearer ")) {
             jwtToken = requestTokenHeader.substring(7);
-            try {
-                username = jwtUtil.extractUsername(jwtToken);
-                validateAndSetAuthentication(request, username, jwtToken);
-            } catch (ExpiredJwtException e) {
-                logger.warn("JWT Token has expired", e);
-                sendJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "JWT Token has expired");
-                return;
-            } catch (IllegalArgumentException | IllegalStateException e) {
-                logger.warn("Error processing JWT Token", e);
-                sendJsonErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
-                return;
-            } catch (Exception e) {
-                logger.error("Unexpected error processing JWT Token", e);
-                sendJsonErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "An unexpected error occurred");
-                return;
+        }
+        // If not found in header, check for token in cookie
+        else {
+            Cookie[] cookies = request.getCookies();
+            if (cookies != null) {
+                for (Cookie cookie : cookies) {
+                    if ("jwt".equals(cookie.getName())) {
+                        jwtToken = cookie.getValue();
+                        break;
+                    }
+                }
             }
-        } else {
+        }
+
+        // If no token is found, handle as unauthorized
+        if (jwtToken == null) {
             handleInvalidToken(response, requestTokenHeader);
+            return;
+        }
+
+        try {
+            String username = jwtUtil.extractUsername(jwtToken);
+            validateAndSetAuthentication(request, username, jwtToken);
+        } catch (ExpiredJwtException e) {
+            logger.warn("JWT Token has expired", e);
+            sendJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "JWT Token has expired");
+            return;
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            logger.warn("Error processing JWT Token", e);
+            sendJsonErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+            return;
+        } catch (Exception e) {
+            logger.error("Unexpected error processing JWT Token", e);
+            sendJsonErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "An unexpected error occurred");
             return;
         }
 

@@ -8,6 +8,8 @@ import com.roomfinder.entity.User;
 import com.roomfinder.enums.UserRole;
 import com.roomfinder.security.JwtUtil;
 import com.roomfinder.service.UserService;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,21 +44,16 @@ public class AuthController {
 
 
     @PostMapping("/login")
-    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> authenticateUser(
+            @Valid @RequestBody LoginRequest loginRequest,
+            HttpServletResponse response) {
         try {
-            // Log login attempt
-            logger.info("Login attempt for identifier: {}", loginRequest.getIdentifier());
-
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             loginRequest.getIdentifier(),
                             loginRequest.getPassword()
                     )
             );
-
-            // Log successful authentication details
-            logger.info("Authentication successful for: {}", authentication.getName());
-            logger.info("User authorities: {}", authentication.getAuthorities());
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
@@ -71,18 +68,37 @@ public class AuthController {
                     userRoles
             );
 
-            // Log token generation
-            logger.info("JWT generated for user: {}", authentication.getName());
+            // Create HTTP-only cookie
+            Cookie jwtCookie = new Cookie("jwt", jwt);
+            jwtCookie.setHttpOnly(true);
+            jwtCookie.setSecure(true);
+            jwtCookie.setPath("/");
+            jwtCookie.setMaxAge(24 * 60 * 60);
 
-            return ResponseEntity.ok(new JwtResponse(jwt));
+            response.addCookie(jwtCookie);
+
+            // Return JWT response with username and role
+            return ResponseEntity.ok(new JwtResponse(
+                    jwt ));
 
         } catch (Exception e) {
-            // Detailed error logging
-            logger.error("Login error for identifier: {}", loginRequest.getIdentifier(), e);
             return ResponseEntity
                     .badRequest()
-                    .body(new MessageResponse("Error: Invalid username or password"));
+                    .body(new MessageResponse("Error: Invalid credentials"));
         }
+    }
+
+    // Add logout endpoint
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletResponse response) {
+        Cookie jwtCookie = new Cookie("jwt", null);
+        jwtCookie.setHttpOnly(true);
+        jwtCookie.setSecure(true);
+        jwtCookie.setPath("/");
+        jwtCookie.setMaxAge(0); // Expire immediately
+
+        response.addCookie(jwtCookie);
+        return ResponseEntity.ok(new MessageResponse("Logged out successfully"));
     }
     @GetMapping("/validate")
     public ResponseEntity<?> validateToken(@RequestHeader("Authorization") String token) {
