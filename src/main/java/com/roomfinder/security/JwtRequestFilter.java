@@ -44,35 +44,20 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         String requestURI = request.getRequestURI();
 
-        // Skip authentication for public endpoints
         if (isPublicEndpoint(requestURI)) {
             chain.doFilter(request, response);
             return;
         }
 
-        String jwtToken = null;
-        String requestTokenHeader = request.getHeader("Authorization");
+        String jwtToken = extractJwtFromCookie(request);
 
-        // Check for token in Authorization header
-        if (requestTokenHeader != null && requestTokenHeader.startsWith("Bearer ")) {
-            jwtToken = requestTokenHeader.substring(7);
-        }
-        // If not found in header, check for token in cookie
-        else {
-            Cookie[] cookies = request.getCookies();
-            if (cookies != null) {
-                for (Cookie cookie : cookies) {
-                    if ("jwt".equals(cookie.getName())) {
-                        jwtToken = cookie.getValue();
-                        break;
-                    }
-                }
-            }
-        }
-
-        // If no token is found, handle as unauthorized
+        // If not found in cookie, check header (optional)
         if (jwtToken == null) {
-            handleInvalidToken(response, requestTokenHeader);
+            jwtToken = extractJwtFromHeader(request);
+        }
+
+        if (jwtToken == null) {
+            sendJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Missing authentication token");
             return;
         }
 
@@ -81,19 +66,35 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             validateAndSetAuthentication(request, username, jwtToken);
         } catch (ExpiredJwtException e) {
             logger.warn("JWT Token has expired", e);
-            sendJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "JWT Token has expired");
-            return;
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            logger.warn("Error processing JWT Token", e);
-            sendJsonErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+            sendJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Token expired");
             return;
         } catch (Exception e) {
-            logger.error("Unexpected error processing JWT Token", e);
-            sendJsonErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "An unexpected error occurred");
+            logger.error("Authentication error", e);
+            sendJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid token");
             return;
         }
 
         chain.doFilter(request, response);
+    }
+
+    private String extractJwtFromCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if ("jwt".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
+    }
+
+    private String extractJwtFromHeader(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            return header.substring(7);
+        }
+        return null;
     }
 
     private boolean isPublicEndpoint(String requestURI) {

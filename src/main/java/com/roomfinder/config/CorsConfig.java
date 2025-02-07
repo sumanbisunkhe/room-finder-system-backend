@@ -16,30 +16,13 @@ public class CorsConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
-        // Allow specific origins (frontend URLs)
-        config.setAllowedOrigins(List.of("http://localhost:5173", "http://127.0.0.1:5173")); // Add more origins if needed
-
-        // Allow credentials (cookies, authorization headers)
+        config.setAllowedOrigins(List.of("http://localhost:5173", "http://127.0.0.1:5173"));
         config.setAllowCredentials(true);
+        config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of("Set-Cookie", "Authorization", "Content-Disposition"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 
-        // Allow specific headers
-        config.setAllowedHeaders(List.of(
-                "Authorization", "Content-Type", "Accept", "X-Requested-With", "Cache-Control"
-        ));
-
-        // Expose specific headers to the frontend
-        config.setExposedHeaders(List.of(
-                "Authorization", "Content-Disposition"
-        ));
-
-        // Allow specific HTTP methods
-        config.setAllowedMethods(List.of(
-                "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
-        ));
-
-        // Apply this configuration to all endpoints
         source.registerCorsConfiguration("/**", config);
-
         return new CorsFilter(source);
     }
 }

@@ -13,6 +13,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -55,35 +58,29 @@ public class AuthController {
                     )
             );
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-
             List<UserRole> userRoles = authentication.getAuthorities().stream()
                     .map(GrantedAuthority::getAuthority)
                     .map(role -> role.replace("ROLE_", ""))
                     .map(UserRole::valueOf)
                     .collect(Collectors.toList());
 
-            String jwt = jwtUtil.generateToken(
-                    authentication.getName(),
-                    userRoles
-            );
+            String jwt = jwtUtil.generateToken(authentication.getName(), userRoles);
 
-            // Create HTTP-only cookie
-            Cookie jwtCookie = new Cookie("jwt", jwt);
-            jwtCookie.setHttpOnly(true);
-            jwtCookie.setSecure(true);
-            jwtCookie.setPath("/");
-            jwtCookie.setMaxAge(24 * 60 * 60);
+            // Use proper cookie construction
+            ResponseCookie cookie = ResponseCookie.from("jwt", jwt)
+                    .httpOnly(true)
+                    .secure(false) // Set to true in production
+                    .path("/")
+                    .maxAge(24 * 60 * 60)
+                    .sameSite("Lax") // Important for cross-site requests
+                    .build();
 
-            response.addCookie(jwtCookie);
+            response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
-            // Return JWT response with username and role
-            return ResponseEntity.ok(new JwtResponse(
-                    jwt ));
+            return ResponseEntity.ok(new JwtResponse(jwt));
 
         } catch (Exception e) {
-            return ResponseEntity
-                    .badRequest()
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new MessageResponse("Error: Invalid credentials"));
         }
     }
