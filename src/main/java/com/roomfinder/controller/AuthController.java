@@ -98,19 +98,40 @@ public class AuthController {
         return ResponseEntity.ok(new MessageResponse("Logged out successfully"));
     }
     @GetMapping("/validate")
-    public ResponseEntity<?> validateToken(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> validateToken(@CookieValue(name = "jwt", required = false) String token) {
         try {
-            if (token != null && token.startsWith("Bearer ")) {
-                String jwt = token.substring(7);
-                String username = jwtUtil.extractUsername(jwt);
-
-                if (username != null && jwtUtil.validateToken(jwt, username)) {
-                    return ResponseEntity.ok(new MessageResponse("Token is valid"));
+            if (token != null) {
+                String username = jwtUtil.extractUsername(token);
+                if (username != null && jwtUtil.validateToken(token, username)) {
+                    UserRole role = jwtUtil.extractUserRole(token);
+                    return ResponseEntity.ok(new MessageResponse("Valid token"));
                 }
             }
-            return ResponseEntity.badRequest().body(new MessageResponse("Invalid token"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Invalid token"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Error validating token"));
+            logger.error("Error validating token: ", e);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Error validating token"));
+        }
+    }
+    @GetMapping("/token")
+    public ResponseEntity<?> getToken(@CookieValue(name = "jwt", required = false) String token) {
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("No token found"));
+        }
+
+        try {
+            String username = jwtUtil.extractUsername(token);
+            if (username != null && jwtUtil.validateToken(token, username)) {
+                return ResponseEntity.ok(new JwtResponse(token));
+            }
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Invalid token"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Error processing token"));
         }
     }
 }

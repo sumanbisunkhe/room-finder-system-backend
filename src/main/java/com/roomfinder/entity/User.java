@@ -18,7 +18,10 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "users")
+@Table(name = "users", uniqueConstraints = {
+        @UniqueConstraint(name = "UNIQUE_username", columnNames = "username"),
+        @UniqueConstraint(name = "UNIQUE_email", columnNames = "email"),
+})
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

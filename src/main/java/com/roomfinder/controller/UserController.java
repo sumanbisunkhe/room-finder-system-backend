@@ -6,6 +6,7 @@ import com.roomfinder.dto.request.UpdateProfileRequest;
 import com.roomfinder.dto.response.ApiResponse;
 import com.roomfinder.entity.User;
 import com.roomfinder.exceptions.UserNotFoundException;
+import com.roomfinder.security.JwtUtil;
 import com.roomfinder.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,29 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @GetMapping("/current")
+    public ResponseEntity<ApiResponse> getCurrentUser(@CookieValue(name = "jwt", required = false) String token) {
+        try {
+            if (token == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ApiResponse(false, "No token found"));
+            }
+
+            String username = jwtUtil.extractUsername(token);
+            Optional<User> userOptional = userService.getUserByUsername(username);
+
+            return userOptional.map(user -> ResponseEntity.ok(new ApiResponse(true, "User retrieved successfully", user))).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponse(false, "User not found")));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse(false, "Error fetching current user: " + e.getMessage()));
+        }
+    }
 
     // Register a new user
     @PostMapping("/register")

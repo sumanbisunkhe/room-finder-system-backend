@@ -40,29 +40,23 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-                .csrf(AbstractHttpConfigurer::disable)
+                // Disable anonymous authentication so that requests without a valid JWT are not treated as authenticated
+                .anonymous(anonymous -> anonymous.disable())
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(
-                                "/api/users/register",
-                                "/api/auth/login"
-                        ).permitAll()
-
+                        .requestMatchers("/api/users/register", "/api/auth/login").permitAll()
                         .requestMatchers(
                                 "/api/bookings/{id}/approve",
                                 "/api/bookings/{id}/reject"
                         ).hasRole("LANDLORD")
-
                         .requestMatchers(
                                 "/api/bookings",
                                 "/api/bookings/{id}/cancel"
                         ).hasRole("SEEKER")
-
                         .requestMatchers(
                                 "/api/bookings/{id}",
                                 "/api/bookings/room/{roomId}",
                                 "/api/bookings/room/{roomId}/pending"
                         ).hasAnyRole("LANDLORD", "SEEKER")
-
                         .requestMatchers(
                                 "/api/users",
                                 "/api/users/admins",
@@ -71,7 +65,9 @@ public class SecurityConfig {
                                 "/api/users/seekers-and-landlords",
                                 "/api/users/{id}/activate",
                                 "/api/users/{id}/deactivate",
-                                "/api/users/{id}/delete"
+                                "/api/users/{id}/delete",
+                                "/api/csv/import/**",
+                                "/api/csv/export/**"
                         ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/api/users/{id}/update",
@@ -105,6 +101,7 @@ public class SecurityConfig {
 
         return http.build();
     }
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
