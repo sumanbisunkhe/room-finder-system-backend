@@ -92,6 +92,16 @@ public class UserServiceImpl implements UserService {
         if (updatedRequest.getPhoneNumber() != null) {
             user.setPhoneNumber(updatedRequest.getPhoneNumber());
         }
+        if (updatedRequest.getRole() != null) {
+            user.setRole(updatedRequest.getRole());
+        }
+
+        if (updatedRequest.getPassword() != null) {
+            user.setPassword(passwordEncoder.encode(updatedRequest.getPassword()));
+        }
+        if (updatedRequest.getPassword() == null) {
+            user.setPassword(user.getPassword());
+        }
 
         // Update the updated timestamp
         user.setUpdatedAt(LocalDateTime.now());

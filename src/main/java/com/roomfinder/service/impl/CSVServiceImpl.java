@@ -15,7 +15,10 @@ import com.roomfinder.repository.RoomRepository;
 import com.roomfinder.repository.UserRepository;
 import com.roomfinder.service.CSVService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
@@ -32,16 +35,20 @@ public class CSVServiceImpl implements CSVService {
     private final RoomRepository roomRepository;
     private final MessageRepository messageRepository;
     private final BookingRepository bookingRepository;
+    private final PasswordEncoder passwordEncoder;
+
+
 
     @Autowired
     public CSVServiceImpl(UserRepository userRepository,
                           RoomRepository roomRepository,
                           MessageRepository messageRepository,
-                          BookingRepository bookingRepository) {
+                          BookingRepository bookingRepository, BCryptPasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.roomRepository = roomRepository;
         this.messageRepository = messageRepository;
         this.bookingRepository = bookingRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     // ----- USER CSV OPERATIONS -----
@@ -77,6 +84,7 @@ public class CSVServiceImpl implements CSVService {
     }
 
     @Override
+    @Transactional
     public void importUsersFromCSV(MultipartFile file) throws IOException, CsvValidationException {
         List<User> users = new ArrayList<>();
 
@@ -85,31 +93,36 @@ public class CSVServiceImpl implements CSVService {
 
             String[] nextRecord;
             boolean firstLine = true;
+            int lineNumber = 0;
 
             while ((nextRecord = csvReader.readNext()) != null) {
-                if (firstLine) { // Skip header
+                lineNumber++;
+                if (firstLine) {
                     firstLine = false;
                     continue;
                 }
-                User user = new User();
-                // Ignore id since it is auto-generated
-                user.setUsername(nextRecord[1]);
-                user.setPassword(nextRecord[2]);
-                user.setEmail(nextRecord[3]);
-                user.setFullName(nextRecord[4]);
-                user.setPhoneNumber(nextRecord[5]);
-                if (!nextRecord[6].isEmpty()) {
-                    user.setRole(UserRole.valueOf(nextRecord[6]));
+                try {
+                    User user = new User();
+                    user.setUsername(nextRecord[1]);
+                    String encryptedPassword = passwordEncoder.encode(nextRecord[2]);
+                    user.setPassword(encryptedPassword);
+                    user.setEmail(nextRecord[3]);
+                    user.setFullName(nextRecord[4]);
+                    user.setPhoneNumber(nextRecord[5]);
+                    if (!nextRecord[6].isEmpty()) {
+                        user.setRole(UserRole.valueOf(nextRecord[6]));
+                    }
+                    if (!nextRecord[7].isEmpty()) {
+                        user.setCreatedAt(LocalDateTime.parse(nextRecord[7]));
+                    }
+                    if (!nextRecord[8].isEmpty()) {
+                        user.setUpdatedAt(LocalDateTime.parse(nextRecord[8]));
+                    }
+                    user.setActive(Boolean.parseBoolean(nextRecord[9]));
+                    users.add(user);
+                } catch (Exception e) {
+                    throw new RuntimeException("Error processing user at line " + lineNumber + ": " + e.getMessage(), e);
                 }
-                if (!nextRecord[7].isEmpty()) {
-                    user.setCreatedAt(LocalDateTime.parse(nextRecord[7]));
-                }
-                if (!nextRecord[8].isEmpty()) {
-                    user.setUpdatedAt(LocalDateTime.parse(nextRecord[8]));
-                }
-                user.setActive(Boolean.parseBoolean(nextRecord[9]));
-
-                users.add(user);
             }
         }
         userRepository.saveAll(users);
@@ -239,6 +252,7 @@ public class CSVServiceImpl implements CSVService {
     }
 
     @Override
+    @Transactional
     public void importMessagesFromCSV(MultipartFile file) throws IOException {
         List<Message> messages = new ArrayList<>();
 
@@ -247,32 +261,36 @@ public class CSVServiceImpl implements CSVService {
 
             String[] nextRecord;
             boolean firstLine = true;
+            int lineNumber = 0;
 
             while ((nextRecord = csvReader.readNext()) != null) {
+                lineNumber++;
                 if (firstLine) {
                     firstLine = false;
                     continue;
                 }
-                Message message = new Message();
-                // Ignore id (auto-generated)
-                message.setSenderId(Long.parseLong(nextRecord[1]));
-                message.setReceiverId(Long.parseLong(nextRecord[2]));
-                message.setContent(nextRecord[3]);
-                if (!nextRecord[4].isEmpty()) {
-                    message.setSentAt(LocalDateTime.parse(nextRecord[4]));
+                try {
+                    Message message = new Message();
+                    message.setSenderId(Long.parseLong(nextRecord[1]));
+                    message.setReceiverId(Long.parseLong(nextRecord[2]));
+                    message.setContent(nextRecord[3]);
+                    if (!nextRecord[4].isEmpty()) {
+                        message.setSentAt(LocalDateTime.parse(nextRecord[4]));
+                    }
+                    message.setRead(Boolean.parseBoolean(nextRecord[5]));
+                    if (nextRecord.length > 6 && !nextRecord[6].isEmpty()) {
+                        message.setRoomId(Long.parseLong(nextRecord[6]));
+                    }
+                    messages.add(message);
+                } catch (Exception e) {
+                    throw new RuntimeException("Error processing message at line " + lineNumber + ": " + e.getMessage(), e);
                 }
-                message.setRead(Boolean.parseBoolean(nextRecord[5]));
-                if (nextRecord.length > 6 && !nextRecord[6].isEmpty()) {
-                    message.setRoomId(Long.parseLong(nextRecord[6]));
-                }
-                messages.add(message);
             }
         } catch (CsvValidationException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("CSV validation error: " + e.getMessage(), e);
         }
         messageRepository.saveAll(messages);
     }
-
     // ----- BOOKING CSV OPERATIONS -----
     @Override
     public ByteArrayInputStream exportBookingsToCSV() throws IOException {
@@ -303,6 +321,7 @@ public class CSVServiceImpl implements CSVService {
     }
 
     @Override
+    @Transactional
     public void importBookingsFromCSV(MultipartFile file) throws IOException {
         List<Booking> bookings = new ArrayList<>();
 
@@ -311,29 +330,34 @@ public class CSVServiceImpl implements CSVService {
 
             String[] nextRecord;
             boolean firstLine = true;
+            int lineNumber = 0;
 
             while ((nextRecord = csvReader.readNext()) != null) {
+                lineNumber++;
                 if (firstLine) {
                     firstLine = false;
                     continue;
                 }
-                Booking booking = new Booking();
-                // Ignore id (auto-generated)
-                booking.setRoomId(Long.parseLong(nextRecord[1]));
-                booking.setSeekerId(Long.parseLong(nextRecord[2]));
-                if (!nextRecord[3].isEmpty()) {
-                    booking.setBookingDate(LocalDateTime.parse(nextRecord[3]));
+                try {
+                    Booking booking = new Booking();
+                    booking.setRoomId(Long.parseLong(nextRecord[1]));
+                    booking.setSeekerId(Long.parseLong(nextRecord[2]));
+                    if (!nextRecord[3].isEmpty()) {
+                        booking.setBookingDate(LocalDateTime.parse(nextRecord[3]));
+                    }
+                    booking.setStartDate(LocalDate.parse(nextRecord[4]));
+                    booking.setEndDate(LocalDate.parse(nextRecord[5]));
+                    if (!nextRecord[6].isEmpty()) {
+                        booking.setStatus(BookingStatus.valueOf(nextRecord[6]));
+                    }
+                    booking.setComments(nextRecord[7]);
+                    bookings.add(booking);
+                } catch (Exception e) {
+                    throw new RuntimeException("Error processing booking at line " + lineNumber + ": " + e.getMessage(), e);
                 }
-                booking.setStartDate(LocalDate.parse(nextRecord[4]));
-                booking.setEndDate(LocalDate.parse(nextRecord[5]));
-                if (!nextRecord[6].isEmpty()) {
-                    booking.setStatus(BookingStatus.valueOf(nextRecord[6]));
-                }
-                booking.setComments(nextRecord[7]);
-                bookings.add(booking);
             }
         } catch (CsvValidationException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("CSV validation error: " + e.getMessage(), e);
         }
         bookingRepository.saveAll(bookings);
     }

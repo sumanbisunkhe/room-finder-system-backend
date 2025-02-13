@@ -41,7 +41,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 // Disable anonymous authentication so that requests without a valid JWT are not treated as authenticated
-                .anonymous(anonymous -> anonymous.disable())
+                .anonymous(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/users/register", "/api/auth/login").permitAll()
                         .requestMatchers(

@@ -1,8 +1,9 @@
 package com.roomfinder.dto.request;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
+import com.roomfinder.enums.UserRole;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.validation.constraints.*;
 import lombok.Data;
 
 @Data
@@ -21,4 +22,10 @@ public class UpdateProfileRequest {
             message = "Phone number must be valid and can include an optional '+' sign."
     )
     private String phoneNumber;
+
+    @Enumerated(EnumType.STRING)
+    private UserRole role;
+
+    @Size(min = 8, message = "Password must be at least 8 characters long")
+    private String password;
 }
