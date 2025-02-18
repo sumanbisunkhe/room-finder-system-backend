@@ -66,14 +66,20 @@ public class SecurityConfig {
                                 "/api/users/{id}/activate",
                                 "/api/users/{id}/deactivate",
                                 "/api/users/{id}/delete",
-                                "/api/csv/import/**",
-                                "/api/csv/export/**"
+                                "/api/csv/import/users",
+                                "/api/csv/import/messages",
+                                "/api/csv/import/bookings",
+                                "/api/csv/export/users",
+                                "/api/csv/export/messages",
+                                "/api/csv/export/bookings"
                         ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/api/users/{id}/update",
                                 "/api/users/{id}/change-password"
                         ).hasAnyRole("ADMIN", "SEEKER", "LANDLORD")
                         .requestMatchers(
+                                "/api/csv/import/rooms",
+                                "/api/csv/export/rooms",
                                 "/api/users/username/{username}",
                                 "/api/users/email/{email}"
                         ).hasAnyRole("ADMIN", "LANDLORD")
@@ -116,7 +122,8 @@ public class SecurityConfig {
                 "Content-Type",
                 "Authorization",
                 "X-Requested-With",
-                "Accept"
+                "Accept",
+                "X-Landlord-Id"
         ));
         configuration.setExposedHeaders(Arrays.asList(
                 "Set-Cookie",

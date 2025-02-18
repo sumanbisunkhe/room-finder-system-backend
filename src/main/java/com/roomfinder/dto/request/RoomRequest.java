@@ -29,6 +29,8 @@ public class RoomRequest {
     @Positive(message = "Size must be positive")
     private Integer size;
 
+//    private List<String> existingImages;
+
     private List<MultipartFile> images;
 
     private Map<String, String> amenities;

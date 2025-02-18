@@ -12,7 +12,7 @@ public interface UserService {
     public User register(RegisterRequest registerRequest);
     Optional<User> login(String username, String password);
     User updateProfile(Long userId, UpdateProfileRequest updatedRequest);
-    void changePassword(Long userId,String newPassword);
+    void changePassword(Long userId, String currentPassword, String newPassword);
     void deactivateAccount(Long userId);
     void activateAccount(Long userId);
     void deleteAccount(Long userId);

@@ -1,15 +1,22 @@
 package com.roomfinder.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roomfinder.dto.request.RoomRequest;
 import com.roomfinder.entity.Room;
 import com.roomfinder.service.RoomService;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -18,6 +25,8 @@ import java.util.List;
 public class RoomController {
 
     private final RoomService roomService;
+    private final ObjectMapper objectMapper;
+
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Room> createRoom(
@@ -30,10 +39,18 @@ public class RoomController {
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Room> updateRoom(
             @PathVariable Long id,
+            @RequestPart(value = "existingImages", required = false) String existingImagesJson,
             @Valid @ModelAttribute RoomRequest request,
-            @RequestHeader("X-Landlord-Id") Long landlordId) {
-        Room room = roomService.updateRoom(id, request, landlordId);
-        return ResponseEntity.ok(room);
+            @RequestHeader("X-Landlord-Id") Long landlordId) throws IOException {
+
+        // Parse existingImages from JSON string
+        List<String> existingImages = new ArrayList<>();
+        if (existingImagesJson != null && !existingImagesJson.isEmpty()) {
+            existingImages = objectMapper.readValue(existingImagesJson, new TypeReference<List<String>>() {});
+        }
+
+        Room updatedRoom = roomService.updateRoom(id, request, existingImages, landlordId);
+        return ResponseEntity.ok(updatedRoom);
     }
 
 
@@ -52,6 +69,7 @@ public class RoomController {
         return ResponseEntity.ok(room);
     }
 
+
     @GetMapping("/landlord/{landlordId}")
     public ResponseEntity<List<Room>> getRoomsByLandlord(@PathVariable Long landlordId) {
         List<Room> rooms = roomService.getRoomsByLandlord(landlordId);
@@ -69,8 +87,17 @@ public class RoomController {
 
 
     @PatchMapping("/{id}/availability")
-    public ResponseEntity<Void> toggleAvailability(@PathVariable Long id) {
-        roomService.toggleAvailability(id);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<?> toggleAvailability(
+            @PathVariable Long id,
+            @RequestHeader("X-Landlord-Id") Long landlordId) {
+
+        try {
+            roomService.toggleAvailability(id, landlordId);
+            return ResponseEntity.ok().build();
+        } catch (EntityNotFoundException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+        } catch (AccessDeniedException ex) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());
+        }
     }
 }

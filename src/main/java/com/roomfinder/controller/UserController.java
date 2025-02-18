@@ -88,7 +88,7 @@ public class UserController {
     @PutMapping("/{id}/change-password")
     public ResponseEntity<ApiResponse> changePassword(@PathVariable Long id, @Valid @RequestBody PasswordChangeRequest request) {
         try {
-            userService.changePassword(id, request.getNewPassword());
+            userService.changePassword(id, request.getCurrentPassword(), request.getNewPassword());
             return ResponseEntity.ok(new ApiResponse(true, "Password changed successfully"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)

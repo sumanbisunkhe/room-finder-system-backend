@@ -6,9 +6,12 @@ import com.roomfinder.exceptions.ResourceNotFoundException;
 import com.roomfinder.exceptions.RoomNotFoundException;
 import com.roomfinder.exceptions.UnauthorizedAccessException;
 import com.roomfinder.repository.RoomRepository;
+import com.roomfinder.service.ImageStorageService;
 import com.roomfinder.service.RoomService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,6 +29,7 @@ import java.util.UUID;
 public class RoomServiceImpl implements RoomService {
 
     private final RoomRepository roomRepository;
+    private final ImageStorageService imageStorageService;
 
     @Value("${app.upload.dir:${user.home}/roomfinder/uploads}")
     private String uploadDir;
@@ -52,7 +56,7 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     @Transactional
-    public Room updateRoom(Long roomId, RoomRequest request, Long landlordId) {
+    public Room updateRoom(Long roomId, RoomRequest request, List<String> existingImages, Long landlordId) throws IOException {
         Room room = getRoomById(roomId);
 
         if (!room.getLandlordId().equals(landlordId)) {
@@ -61,16 +65,14 @@ public class RoomServiceImpl implements RoomService {
 
         updateRoomFromRequest(room, request);
 
-        // Handle new image uploads
+        List<String> imagePaths = new ArrayList<>(existingImages);
+
         if (request.getImages() != null && !request.getImages().isEmpty()) {
-            List<String> imagePaths = new ArrayList<>(room.getImages());
-            for (MultipartFile image : request.getImages()) {
-                String imagePath = saveImage(image);
-                imagePaths.add(imagePath);
-            }
-            room.setImages(imagePaths);
+            List<String> newImagePaths = imageStorageService.saveImages(request.getImages());
+            imagePaths.addAll(newImagePaths);
         }
 
+        room.setImages(imagePaths);
         return roomRepository.save(room);
     }
 
@@ -121,8 +123,15 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     @Transactional
-    public void toggleAvailability(Long roomId) {
-        Room room = getRoomById(roomId);
+    public void toggleAvailability(Long roomId, Long landlordId) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new EntityNotFoundException("Room not found with id: " + roomId));
+
+        // Verify landlord ownership
+        if (!room.getLandlordId().equals(landlordId)) {
+            throw new AccessDeniedException("Unauthorized access to modify room");
+        }
+
         room.setAvailable(!room.isAvailable());
         roomRepository.save(room);
     }
@@ -130,20 +139,17 @@ public class RoomServiceImpl implements RoomService {
     @Override
     public String saveImage(MultipartFile file) {
         try {
-            // Create upload directory if it doesn't exist
             Path uploadPath = Paths.get(uploadDir);
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
 
-            // Generate unique filename
             String filename = UUID.randomUUID() + "_" + file.getOriginalFilename();
             Path filePath = uploadPath.resolve(filename);
-
-            // Save file
             Files.copy(file.getInputStream(), filePath);
 
-            return filePath.toString();
+            // Return only the filename instead of full path
+            return filename;
         } catch (IOException e) {
             throw new RuntimeException("Failed to store file", e);
         }

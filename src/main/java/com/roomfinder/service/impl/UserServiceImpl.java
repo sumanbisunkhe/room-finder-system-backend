@@ -112,17 +112,23 @@ public class UserServiceImpl implements UserService {
 
 
     @Override
-    public void changePassword(Long userId, String newPassword) {
-        if (newPassword == null || newPassword.isBlank()) {
-            throw new IllegalArgumentException("Password cannot be null or blank");
+    public void changePassword(Long userId, String currentPassword, String newPassword) {
+        if (currentPassword == null || currentPassword.isBlank()) {
+            throw new IllegalArgumentException("Current password cannot be blank");
         }
-
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new IllegalArgumentException("New password cannot be blank");
+        }
         if (newPassword.length() < 8) {
-            throw new IllegalArgumentException("Password must be at least 8 characters long");
+            throw new IllegalArgumentException("New password must be at least 8 characters long");
         }
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User with ID " + userId + " not found"));
+
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
 
         if (!user.isActive()) {
             throw new IllegalStateException("Cannot change password for an inactive user");
