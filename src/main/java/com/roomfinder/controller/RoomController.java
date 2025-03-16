@@ -53,6 +53,12 @@ public class RoomController {
         return ResponseEntity.ok(updatedRoom);
     }
 
+    @GetMapping
+    public ResponseEntity<List<Room>> getAllRooms() {
+        List<Room> rooms = roomService.getAllRooms();
+        return ResponseEntity.ok(rooms);
+    }
+
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteRoom(

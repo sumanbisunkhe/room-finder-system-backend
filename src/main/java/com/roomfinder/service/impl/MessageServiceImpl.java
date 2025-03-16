@@ -2,10 +2,12 @@ package com.roomfinder.service.impl;
 
 import com.roomfinder.dto.request.MessageRequest;
 import com.roomfinder.dto.request.ValidateUsersRequest;
+import com.roomfinder.dto.response.DirectConversationResponse;
 import com.roomfinder.entity.Message;
 import com.roomfinder.exceptions.ResourceNotFoundException;
 import com.roomfinder.exceptions.UnauthorizedAccessException;
 import com.roomfinder.repository.MessageRepository;
+import com.roomfinder.service.DirectConversationProjection;
 import com.roomfinder.service.MessageService;
 import com.roomfinder.service.UserService;
 import jakarta.transaction.Transactional;
@@ -13,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -51,6 +54,20 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
+    public List<DirectConversationResponse> getDirectConversations(Long userId) {
+        List<DirectConversationProjection> projections = messageRepository.findDirectConversationsWithDetails(userId);
+        return projections.stream()
+                .map(proj -> new DirectConversationResponse(
+                        proj.getOwnUserId(),
+                        proj.getOtherUserId(),
+                        new DirectConversationResponse.LastMessage(
+                                proj.getLastContent(),
+                                proj.getLastSentAt()),
+                        proj.getUnreadCount() != null ? proj.getUnreadCount() : 0))
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public void deleteMessage(Long messageId, Long userId) {
         Message message = messageRepository.findById(messageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
@@ -61,7 +78,11 @@ public class MessageServiceImpl implements MessageService {
 
         messageRepository.delete(message);
     }
-
+    @Override
+    public Message getMessageById(Long messageId) {
+        return messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+    }
     @Override
     public List<Message> getRoomMessages(Long roomId, Long userId) {
         // Verify user has access to this room
@@ -72,8 +93,7 @@ public class MessageServiceImpl implements MessageService {
     @Override
     public List<Message> getConversation(Long otherUserId, Long currentUserId) {
         validateUsers(currentUserId, otherUserId);
-        return messageRepository.findBySenderIdAndReceiverIdOrderBySentAtDesc(
-                currentUserId, otherUserId);
+        return messageRepository.findConversationBetweenUsers(currentUserId, otherUserId);
     }
 
     @Override
@@ -90,7 +110,7 @@ public class MessageServiceImpl implements MessageService {
         ValidateUsersRequest sender = userService.getUserById(senderId);
         ValidateUsersRequest receiver = userService.getUserById(receiverId);
 
-        if (!sender.isValidRole() || !receiver.isValidRole()) {
+        if (sender.isValidRole() || receiver.isValidRole()) {
             throw new UnauthorizedAccessException("Invalid user roles for messaging");
         }
     }

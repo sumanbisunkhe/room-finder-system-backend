@@ -2,6 +2,7 @@ package com.roomfinder.controller;
 
 import com.roomfinder.dto.request.MessageRequest;
 import com.roomfinder.dto.response.ApiResponse;
+import com.roomfinder.dto.response.DirectConversationResponse;
 import com.roomfinder.entity.Message;
 import com.roomfinder.service.MessageService;
 import com.roomfinder.service.UserService;
@@ -51,6 +52,24 @@ public class MessageController {
 
             messageService.markAsRead(messageId, user.getId());
             return ResponseEntity.ok(new ApiResponse(true, "Message marked as read"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse(false, e.getMessage()));
+        }
+
+
+    }
+
+    @GetMapping("/direct-conversations")
+    @PreAuthorize("hasAnyRole('SEEKER', 'LANDLORD')")
+    public ResponseEntity<ApiResponse> getDirectConversations(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            var user = userService.getUserByUsername(userDetails.getUsername())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            List<DirectConversationResponse> conversations = messageService.getDirectConversations(user.getId());
+            return ResponseEntity.ok(new ApiResponse(true, "Direct conversations retrieved successfully", conversations));
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                     .body(new ApiResponse(false, e.getMessage()));

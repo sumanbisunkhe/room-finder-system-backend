@@ -14,8 +14,9 @@ public class ValidateUsersRequest {
     private Long userId;
     private String role;
 
+
     @JsonIgnore
     public boolean isValidRole() {
-        return role != null && (role.equals("SEEKER") || role.equals("LANDLORD"));
+        return role == null || (!role.equals("SEEKER") && !role.equals("LANDLORD"));
     }
 }

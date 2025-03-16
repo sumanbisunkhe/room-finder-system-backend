@@ -23,6 +23,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -110,6 +111,12 @@ public class RoomServiceImpl implements RoomService {
     }
 
     @Override
+    public List<Room> getAllRooms() {
+        return roomRepository.findAll();
+    }
+
+
+    @Override
     public List<Room> searchRooms(String city, Double maxPrice, String address) {
         if (address != null && !address.isEmpty()) {
             return roomRepository.findRoomsBySimilarAddress(address);
@@ -165,6 +172,13 @@ public class RoomServiceImpl implements RoomService {
         return roomRepository.findById(roomId)
                 .map(Room::getLandlordId)
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + roomId));
+    }
+    @Override
+    public List<Long> getRoomIdsByLandlordId(Long landlordId) {
+        List<Room> rooms = roomRepository.findByLandlordId(landlordId);
+        return rooms.stream()
+                .map(Room::getId)
+                .collect(Collectors.toList());
     }
 
     private void updateRoomFromRequest(Room room, RoomRequest request) {

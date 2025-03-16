@@ -132,6 +132,14 @@ public class BookingServiceImpl implements BookingService {
     public List<Booking> getPendingBookingsByRoom(Long roomId) {
         return bookingRepository.findByRoomIdAndStatus(roomId, BookingStatus.PENDING);
     }
+    @Override
+    public List<Booking> getBookingsByLandlord(Long landlordId) {
+        List<Long> roomIds = roomService.getRoomIdsByLandlordId(landlordId);
+        if (roomIds.isEmpty()) {
+            return List.of();
+        }
+        return bookingRepository.findByRoomIdIn(roomIds);
+    }
 
     private void validateBookingDates(LocalDate startDate, LocalDate endDate) {
         if (startDate.isAfter(endDate)) {

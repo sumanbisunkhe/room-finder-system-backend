@@ -1,6 +1,7 @@
 package com.roomfinder.service;
 
 import com.roomfinder.dto.request.MessageRequest;
+import com.roomfinder.dto.response.DirectConversationResponse;
 import com.roomfinder.entity.Message;
 
 import java.util.List;
@@ -13,4 +14,7 @@ public interface MessageService {
     List<Message> getConversation(Long otherUserId, Long currentUserId);
     List<Message> getUnreadMessages(Long userId);
     List<Long> getUserRooms(Long userId);
+    public List<DirectConversationResponse> getDirectConversations(Long userId);
+
+    Message getMessageById(Long messageId);
 }

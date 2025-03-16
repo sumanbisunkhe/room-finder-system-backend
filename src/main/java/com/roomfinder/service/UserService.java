@@ -17,6 +17,9 @@ public interface UserService {
     void activateAccount(Long userId);
     void deleteAccount(Long userId);
 
+    Optional<User> loadUserById(Long userId);
+
+
     List<User> getAllUsers();
     List<User> getAllSeekers();
     List<User> getAllLandlords();

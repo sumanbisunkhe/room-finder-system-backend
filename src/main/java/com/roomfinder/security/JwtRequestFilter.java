@@ -10,14 +10,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.io.IOException;
 import java.util.List;
@@ -33,9 +34,11 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     @Autowired
     private JwtUtil jwtUtil;
 
+    // Define endpoints that don't require authentication
     private static final List<String> PUBLIC_ENDPOINTS = List.of(
             "/api/users/register",
-            "/api/auth/login"
+            "/api/auth/login",
+            "/ws", "/ws/**"  // WebSocket endpoints for handshake
     );
 
     @Override
@@ -43,41 +46,57 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String requestURI = request.getRequestURI();
+        logger.debug("Processing request to: {}", requestURI);
 
+        // Bypass filter for public endpoints
         if (isPublicEndpoint(requestURI)) {
             chain.doFilter(request, response);
             return;
         }
 
-        String jwtToken = extractJwtFromCookie(request);
-
-        // If not found in cookie, check header (optional)
-        if (jwtToken == null) {
-            jwtToken = extractJwtFromHeader(request);
-        }
+        // Extract JWT from appropriate sources
+        String jwtToken = extractJwtFromRequest(request);
 
         if (jwtToken == null) {
-            sendJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Missing authentication token");
+            sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "Missing authentication token");
             return;
         }
 
         try {
-            String username = jwtUtil.extractUsername(jwtToken);
-            validateAndSetAuthentication(request, username, jwtToken);
-        } catch (ExpiredJwtException e) {
-            logger.warn("JWT Token has expired", e);
-            sendJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Token expired");
+            authenticateRequest(request, jwtToken);
+        } catch (ExpiredJwtException ex) {
+            handleTokenExpiration(response, ex);
             return;
-        } catch (Exception e) {
-            logger.error("Authentication error", e);
-            sendJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid token");
+        } catch (Exception ex) {
+            handleAuthenticationError(response, ex);
             return;
         }
 
         chain.doFilter(request, response);
     }
 
-    private String extractJwtFromCookie(HttpServletRequest request) {
+    private String extractJwtFromRequest(HttpServletRequest request) {
+        // 1. Check Authorization header first (for WebSocket/STOMP)
+        String headerToken = extractTokenFromHeader(request);
+        if (headerToken != null) return headerToken;
+
+        // 2. Check cookies (for traditional HTTP requests)
+        String cookieToken = extractTokenFromCookies(request);
+        if (cookieToken != null) return cookieToken;
+
+        // 3. Check URL parameter (alternative for non-header clients)
+        return extractTokenFromParams(request);
+    }
+
+    private String extractTokenFromHeader(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            return header.substring(7);
+        }
+        return null;
+    }
+
+    private String extractTokenFromCookies(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         if (cookies != null) {
             for (Cookie cookie : cookies) {
@@ -89,52 +108,74 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         return null;
     }
 
-    private String extractJwtFromHeader(HttpServletRequest request) {
-        String header = request.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ")) {
-            return header.substring(7);
+    private String extractTokenFromParams(HttpServletRequest request) {
+        return request.getParameter("token");
+    }
+
+    private void authenticateRequest(HttpServletRequest request, String jwtToken) {
+        String username = jwtUtil.extractUsername(jwtToken);
+        List<UserRole> roles = jwtUtil.extractRoles(jwtToken);
+
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            // For WebSocket, create lightweight authentication
+            if (isWebSocketRequest(request)) {
+                createWebSocketAuthentication(username, roles, request);
+            } else {
+                // Traditional HTTP authentication
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                validateHttpAuthentication(jwtToken, userDetails, request);
+            }
         }
-        return null;
+    }
+
+    private boolean isWebSocketRequest(HttpServletRequest request) {
+        return request.getRequestURI().startsWith("/ws");
+    }
+
+    private void createWebSocketAuthentication(String username, List<UserRole> roles, HttpServletRequest request) {
+        List<GrantedAuthority> authorities = roles.stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
+                .collect(Collectors.toList());
+
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(username, null, authorities);
+        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        logger.info("WebSocket user authenticated: {}", username);
+    }
+
+    private void validateHttpAuthentication(String jwtToken, UserDetails userDetails, HttpServletRequest request) {
+        if (jwtUtil.validateToken(jwtToken, userDetails.getUsername())) {
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            logger.info("HTTP user authenticated: {}", userDetails.getUsername());
+        }
     }
 
     private boolean isPublicEndpoint(String requestURI) {
         return PUBLIC_ENDPOINTS.stream().anyMatch(requestURI::startsWith);
     }
 
-    private void validateAndSetAuthentication(HttpServletRequest request, String username, String jwtToken) {
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-            if (jwtUtil.validateToken(jwtToken, userDetails.getUsername())) {
-                List<UserRole> roles = jwtUtil.extractRoles(jwtToken);
-                List<GrantedAuthority> authorities = roles.stream()
-                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
-                        .collect(Collectors.toList());
-
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-                logger.debug("Authentication set for user: {}", username);
-            }
-        }
+    private void handleTokenExpiration(HttpServletResponse response, ExpiredJwtException ex) throws IOException {
+        logger.warn("JWT Token expired: {}", ex.getMessage());
+        sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "Token expired");
     }
 
-    private void handleInvalidToken(HttpServletResponse response, String requestTokenHeader) throws IOException {
-        if (requestTokenHeader == null) {
-            logger.warn("Authorization header is missing");
-            sendJsonErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "Authorization header is missing");
-        } else {
-            logger.warn("JWT Token does not begin with Bearer String");
-            sendJsonErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "JWT Token must begin with Bearer String");
-        }
+    private void handleAuthenticationError(HttpServletResponse response, Exception ex) throws IOException {
+        logger.error("Authentication error: {}", ex.getMessage());
+        sendErrorResponse(response, HttpStatus.UNAUTHORIZED, "Invalid token");
     }
 
-    private void sendJsonErrorResponse(HttpServletResponse response, int status, String message) throws IOException {
-        response.setStatus(status);
+    private void sendErrorResponse(HttpServletResponse response, HttpStatus status, String message) throws IOException {
+        response.setStatus(status.value());
         response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
-        response.getWriter().write(String.format("{\"error\": \"%s\"}", message));
+        response.getWriter().write(String.format(
+                "{\"status\":%d,\"error\":\"%s\",\"message\":\"%s\"}",
+                status.value(),
+                status.getReasonPhrase(),
+                message
+        ));
     }
 }

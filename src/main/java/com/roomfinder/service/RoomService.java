@@ -13,10 +13,12 @@ public interface RoomService {
     public void deleteRoom(Long roomId, Long landlordId);
     Room getRoomById(Long roomId);
     List<Room> getRoomsByLandlord(Long landlordId);
+    List<Room> getAllRooms();
     List<Room> searchRooms(String city, Double maxPrice, String address);
     void toggleAvailability(Long roomId,Long landlordId);
     String saveImage(MultipartFile file);
     boolean isRoomOwner(Long roomId, Long landlordId);
     Long getRoomOwnerId(Long roomId);
+    List<Long> getRoomIdsByLandlordId(Long landlordId);
 
 }

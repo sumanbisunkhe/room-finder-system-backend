@@ -148,6 +148,13 @@ public class UserController {
                     .body(new ApiResponse(false, "An error occurred while deleting the account"));
         }
     }
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse> getUserById(@PathVariable Long id) {
+        Optional<User> userOptional = userService.loadUserById(id);
+        return userOptional.map(user -> ResponseEntity.ok(new ApiResponse(true, "User found", user)))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ApiResponse(false, "User not found with ID: " + id)));
+    }
     // Get all users
     @GetMapping
     public ResponseEntity<List<User>> getAllUsers() {

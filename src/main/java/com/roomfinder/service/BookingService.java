@@ -14,4 +14,6 @@ public interface BookingService {
     List<Booking> getBookingsBySeeker(Long seekerId);
     List<Booking> getBookingsByRoom(Long roomId);
     List<Booking> getPendingBookingsByRoom(Long roomId);
+    List<Booking> getBookingsByLandlord(Long landlordId);
+
 }

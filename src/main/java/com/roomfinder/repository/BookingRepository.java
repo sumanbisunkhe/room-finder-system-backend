@@ -17,4 +17,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             "AND ((b.startDate BETWEEN :startDate AND :endDate) " +
             "OR (b.endDate BETWEEN :startDate AND :endDate))")
     List<Booking> findOverlappingBookings(Long roomId, LocalDate startDate, LocalDate endDate);
+    List<Booking> findByRoomIdIn(List<Long> roomIds);
+
 }
