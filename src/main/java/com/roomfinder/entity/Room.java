@@ -40,7 +40,8 @@ public class Room {
     @Column(name = "image_path")
     private List<String> images = new ArrayList<>();
 
-    private boolean isAvailable = true;
+    @Column(name = "is_available")
+    private boolean available = true;
 
     private LocalDateTime postedDate = LocalDateTime.now();
 
@@ -49,4 +50,5 @@ public class Room {
     @MapKeyColumn(name = "amenity_name")
     @Column(name = "amenity_value")
     private Map<String, String> amenities = new HashMap<>();
+
 }

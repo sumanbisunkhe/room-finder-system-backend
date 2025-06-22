@@ -3,18 +3,24 @@ package com.roomfinder.service.impl;
 import com.roomfinder.dto.request.RegisterRequest;
 import com.roomfinder.dto.request.UpdateProfileRequest;
 import com.roomfinder.dto.request.ValidateUsersRequest;
+import com.roomfinder.dto.response.GrowthTrendResponse;
 import com.roomfinder.entity.User;
 import com.roomfinder.enums.UserRole;
 import com.roomfinder.exceptions.UserNotFoundException;
 import com.roomfinder.repository.UserRepository;
 import com.roomfinder.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -152,6 +158,7 @@ public class UserServiceImpl implements UserService {
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
     }
+
     @Override
     public void activateAccount(Long userId) {
         User user = userRepository.findById(userId)
@@ -190,28 +197,28 @@ public class UserServiceImpl implements UserService {
 
 
     @Override
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+    public Page<User> getAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable);
     }
 
     @Override
-    public List<User> getAllSeekers() {
-        return userRepository.findAllByRole(UserRole.SEEKER);
+    public Page<User> getAllSeekers(Pageable pageable) {
+        return userRepository.findAllByRole(UserRole.SEEKER, pageable);
     }
 
     @Override
-    public List<User> getAllLandlords() {
-        return userRepository.findAllByRole(UserRole.LANDLORD);
+    public Page<User> getAllLandlords(Pageable pageable) {
+        return userRepository.findAllByRole(UserRole.LANDLORD, pageable);
     }
 
     @Override
-    public List<User> getAllAdmins() {
-        return userRepository.findAllByRole(UserRole.ADMIN);
+    public Page<User> getAllAdmins(Pageable pageable) {
+        return userRepository.findAllByRole(UserRole.ADMIN, pageable);
     }
 
     @Override
-    public List<User> getAllSeekersAndLandlords() {
-        return userRepository.findAllByRoleIn(List.of(UserRole.SEEKER, UserRole.LANDLORD));
+    public Page<User> getAllSeekersAndLandlords(Pageable pageable) {
+        return userRepository.findAllByRoleIn(List.of(UserRole.SEEKER, UserRole.LANDLORD), pageable);
     }
 
     @Override
@@ -233,6 +240,56 @@ public class UserServiceImpl implements UserService {
                 .userId(user.getId())
                 .role(user.getRole().name())
                 .build();
+    }
+
+    @Override
+    public Page<User> searchUsers(String keyword, Pageable pageable) {
+        return userRepository.searchByUsernameOrEmail(keyword, pageable);
+    }
+
+    @Override
+    public Map<String, Long> getUserStatistics() {
+        Map<String, Long> stats = new LinkedHashMap<>();
+
+        stats.put("totalUsers", userRepository.count());
+        stats.put("activeUsers", userRepository.countByIsActive(true));
+        stats.put("inactiveUsers", userRepository.countByIsActive(false));
+        stats.put("totalAdmins", userRepository.countByRole(UserRole.ADMIN));
+        stats.put("totalLandlords", userRepository.countByRole(UserRole.LANDLORD));
+        stats.put("totalSeekers", userRepository.countByRole(UserRole.SEEKER));
+
+        return stats;
+    }
+
+    @Override
+    public List<GrowthTrendResponse> getUserGrowthTrends(String interval) {
+        List<Object[]> results;
+
+        switch (interval.toLowerCase()) {
+            case "daily" -> results = userRepository.findDailyGrowth();
+            case "monthly" -> results = userRepository.findMonthlyGrowth();
+            default -> throw new IllegalArgumentException("Invalid interval. Use 'daily' or 'monthly'.");
+        }
+
+        return results.stream()
+                .map(row -> new GrowthTrendResponse(
+                        (String) row[0],
+                        ((Number) row[1]).longValue(),
+                        (String) row[2]
+                ))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<User> getActiveUsers(Pageable pageable) {
+        return userRepository.findAllByIsActive(true, pageable);
+
+    }
+
+    @Override
+    public Page<User> getInactiveUsers(Pageable pageable) {
+        return userRepository.findAllByIsActive(false, pageable);
+
     }
 
 }

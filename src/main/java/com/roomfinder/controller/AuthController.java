@@ -1,10 +1,8 @@
 package com.roomfinder.controller;
 
 import com.roomfinder.dto.request.LoginRequest;
-import com.roomfinder.dto.request.RegisterRequest;
 import com.roomfinder.dto.response.JwtResponse;
-import com.roomfinder.dto.response.MessageResponse;
-import com.roomfinder.entity.User;
+import com.roomfinder.dto.response.AuthResponse;
 import com.roomfinder.enums.UserRole;
 import com.roomfinder.security.JwtUtil;
 import com.roomfinder.service.UserService;
@@ -21,11 +19,10 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
-import java.util.Collections;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -81,7 +78,7 @@ public class AuthController {
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new MessageResponse("Error: Invalid credentials"));
+                    .body(new AuthResponse("Error: Invalid credentials"));
         }
     }
 
@@ -95,7 +92,7 @@ public class AuthController {
         jwtCookie.setMaxAge(0); // Expire immediately
 
         response.addCookie(jwtCookie);
-        return ResponseEntity.ok(new MessageResponse("Logged out successfully"));
+        return ResponseEntity.ok(new AuthResponse("Logged out successfully"));
     }
     @GetMapping("/validate")
     public ResponseEntity<?> validateToken(@CookieValue(name = "jwt", required = false) String token) {
@@ -104,22 +101,22 @@ public class AuthController {
                 String username = jwtUtil.extractUsername(token);
                 if (username != null && jwtUtil.validateToken(token, username)) {
                     UserRole role = jwtUtil.extractUserRole(token);
-                    return ResponseEntity.ok(new MessageResponse("Valid token"));
+                    return ResponseEntity.ok(new AuthResponse("Valid token"));
                 }
             }
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new MessageResponse("Invalid token"));
+                    .body(new AuthResponse("Invalid token"));
         } catch (Exception e) {
             logger.error("Error validating token: ", e);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new MessageResponse("Error validating token"));
+                    .body(new AuthResponse("Error validating token"));
         }
     }
     @GetMapping("/token")
     public ResponseEntity<?> getToken(@CookieValue(name = "jwt", required = false) String token) {
         if (token == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new MessageResponse("No token found"));
+                    .body(new AuthResponse("No token found"));
         }
 
         try {
@@ -128,10 +125,10 @@ public class AuthController {
                 return ResponseEntity.ok(new JwtResponse(token));
             }
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new MessageResponse("Invalid token"));
+                    .body(new AuthResponse("Invalid token"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new MessageResponse("Error processing token"));
+                    .body(new AuthResponse("Error processing token"));
         }
     }
 }

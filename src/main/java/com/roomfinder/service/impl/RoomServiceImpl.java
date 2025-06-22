@@ -11,18 +11,27 @@ import com.roomfinder.service.RoomService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.FileImageOutputStream;
+import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -91,7 +100,6 @@ public class RoomServiceImpl implements RoomService {
             try {
                 Files.deleteIfExists(Paths.get(imagePath));
             } catch (IOException e) {
-                // Log error but continue deletion
                 e.printStackTrace();
             }
         }
@@ -106,25 +114,24 @@ public class RoomServiceImpl implements RoomService {
     }
 
     @Override
-    public List<Room> getRoomsByLandlord(Long landlordId) {
-        return roomRepository.findByLandlordId(landlordId);
+    public Page<Room> getRoomsByLandlord(Long landlordId, Pageable pageable) {
+        return roomRepository.findByLandlordId(landlordId, pageable);
     }
 
     @Override
-    public List<Room> getAllRooms() {
-        return roomRepository.findAll();
+    public Page<Room> getAllRooms(Pageable pageable) {
+        return roomRepository.findAll(pageable);
     }
 
-
     @Override
-    public List<Room> searchRooms(String city, Double maxPrice, String address) {
+    public Page<Room> searchRooms(String city, Double maxPrice, String address, Pageable pageable) {
         if (address != null && !address.isEmpty()) {
-            return roomRepository.findRoomsBySimilarAddress(address);
+            return roomRepository.findRoomsBySimilarAddress(address, pageable);
         }
         if (maxPrice != null) {
-            return roomRepository.findAvailableRoomsByMaxPrice(maxPrice);
+            return roomRepository.findAvailableRoomsByMaxPrice(maxPrice, pageable);
         }
-        return roomRepository.findByCityAndIsAvailableTrue(city);
+        return roomRepository.findByCityAndAvailableTrue(city, pageable);
     }
 
 
@@ -144,6 +151,19 @@ public class RoomServiceImpl implements RoomService {
     }
 
     @Override
+    public void setAvailability(Long roomId, Long landlordId, boolean available) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new EntityNotFoundException("Room not found"));
+
+        if (!room.getLandlordId().equals(landlordId)) {
+            throw new AccessDeniedException("Unauthorized access to modify room");
+        }
+
+        room.setAvailable(available);
+        roomRepository.save(room);
+    }
+
+    @Override
     public String saveImage(MultipartFile file) {
         try {
             Path uploadPath = Paths.get(uploadDir);
@@ -151,14 +171,72 @@ public class RoomServiceImpl implements RoomService {
                 Files.createDirectories(uploadPath);
             }
 
-            String filename = UUID.randomUUID() + "_" + file.getOriginalFilename();
+            String originalFilename = file.getOriginalFilename();
+            String filename = UUID.randomUUID() + "_" + (originalFilename != null ? originalFilename : "image") + ".jpg";
             Path filePath = uploadPath.resolve(filename);
-            Files.copy(file.getInputStream(), filePath);
 
-            // Return only the filename instead of full path
+            // Read image using TwelveMonkeys plugin-enhanced ImageIO
+            BufferedImage image = ImageIO.read(file.getInputStream());
+            if (image == null) {
+                throw new RuntimeException("Unsupported image format");
+            }
+
+            // Convert images with transparency to RGB
+            if (image.getTransparency() != Transparency.OPAQUE) {
+                BufferedImage newImage = new BufferedImage(
+                        image.getWidth(),
+                        image.getHeight(),
+                        BufferedImage.TYPE_INT_RGB
+                );
+                Graphics2D g = newImage.createGraphics();
+                g.drawImage(image, 0, 0, null);
+                g.dispose();
+                image = newImage;
+            }
+
+            // Resize large images while maintaining aspect ratio
+            int maxWidth = 1024;
+            int originalWidth = image.getWidth();
+            int originalHeight = image.getHeight();
+            if (originalWidth > maxWidth) {
+                double ratio = (double) maxWidth / originalWidth;
+                int newHeight = (int) (originalHeight * ratio);
+                BufferedImage resizedImage = new BufferedImage(
+                        maxWidth,
+                        newHeight,
+                        BufferedImage.TYPE_INT_RGB
+                );
+                Graphics2D g = resizedImage.createGraphics();
+                g.setRenderingHint(
+                        RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BILINEAR
+                );
+                g.drawImage(image, 0, 0, maxWidth, newHeight, null);
+                g.dispose();
+                image = resizedImage;
+            }
+
+            // Configure high-quality JPEG encoding
+            Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("JPEG");
+            if (!writers.hasNext()) {
+                throw new RuntimeException("JPEG writer not available");
+            }
+            ImageWriter writer = writers.next();
+            ImageWriteParam param = writer.getDefaultWriteParam();
+
+            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+            param.setCompressionQuality(0.85f);  // 85% quality for good balance
+
+            try (FileImageOutputStream output = new FileImageOutputStream(filePath.toFile())) {
+                writer.setOutput(output);
+                writer.write(null, new IIOImage(image, null, null), param);
+            } finally {
+                writer.dispose();
+            }
+
             return filename;
         } catch (IOException e) {
-            throw new RuntimeException("Failed to store file", e);
+            throw new RuntimeException("Failed to process   and store image", e);
         }
     }
 
@@ -173,12 +251,45 @@ public class RoomServiceImpl implements RoomService {
                 .map(Room::getLandlordId)
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + roomId));
     }
+
     @Override
     public List<Long> getRoomIdsByLandlordId(Long landlordId) {
-        List<Room> rooms = roomRepository.findByLandlordId(landlordId);
-        return rooms.stream()
-                .map(Room::getId)
+        return roomRepository.findRoomIdsByLandlordId(landlordId);
+    }
+
+    @Override
+    public Page<Room> getNewListingsLast7Days(Pageable pageable) {
+        LocalDateTime date = LocalDateTime.now().minusDays(7);
+        return roomRepository.findNewListingsSince(date, pageable);
+    }
+
+    @Override
+    public Double getAveragePriceLast7Days() {
+        LocalDateTime date = LocalDateTime.now().minusDays(7);
+        return roomRepository.findAveragePriceSince(date);
+    }
+
+    @Override
+    public Map<String, Object> getNewListingsStatsLast7Days() {
+        LocalDateTime date = LocalDateTime.now().minusDays(7);
+        Double avgPrice = roomRepository.findAveragePriceSince(date);
+        List<Object[]> cityStats = roomRepository.findAveragePriceByCitySince(date);
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalAveragePrice", avgPrice);
+
+        List<Map<String, Object>> cityData = cityStats.stream()
+                .map(arr -> {
+                    Map<String, Object> cityMap = new HashMap<>();
+                    cityMap.put("city", arr[0]);
+                    cityMap.put("averagePrice", arr[1]);
+                    cityMap.put("listingCount", arr[2]);
+                    return cityMap;
+                })
                 .collect(Collectors.toList());
+
+        stats.put("cities", cityData);
+        return stats;
     }
 
     private void updateRoomFromRequest(Room room, RoomRequest request) {

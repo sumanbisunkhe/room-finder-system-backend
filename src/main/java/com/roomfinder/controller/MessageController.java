@@ -3,17 +3,24 @@ package com.roomfinder.controller;
 import com.roomfinder.dto.request.MessageRequest;
 import com.roomfinder.dto.response.ApiResponse;
 import com.roomfinder.dto.response.DirectConversationResponse;
+import com.roomfinder.dto.response.MessageResponse;
 import com.roomfinder.entity.Message;
 import com.roomfinder.service.MessageService;
 import com.roomfinder.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.messaging.simp.annotation.SubscribeMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 
 @RestController
@@ -29,12 +36,11 @@ public class MessageController {
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody MessageRequest request) {
         try {
-            // Get user by username instead of parsing as Long
             var sender = userService.getUserByUsername(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            Message message = messageService.sendMessage(sender.getId(), request);
-            return ResponseEntity.ok(new ApiResponse(true, "Message sent successfully", message));
+            MessageResponse response = messageService.sendAndNotifyMessage(sender.getId(), request);
+            return ResponseEntity.ok(new ApiResponse(true, "Message sent successfully", response));
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                     .body(new ApiResponse(false, e.getMessage()));
@@ -56,8 +62,23 @@ public class MessageController {
             return ResponseEntity.badRequest()
                     .body(new ApiResponse(false, e.getMessage()));
         }
+    }
 
+    @PutMapping("/room/{roomId}/read-all")
+    @PreAuthorize("hasAnyRole('SEEKER', 'LANDLORD')")
+    public ResponseEntity<ApiResponse> markRoomMessagesAsRead(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long roomId) {
+        try {
+            var user = userService.getUserByUsername(userDetails.getUsername())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
 
+            messageService.markMessagesAsRead(roomId, user.getId());
+            return ResponseEntity.ok(new ApiResponse(true, "All messages marked as read"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse(false, e.getMessage()));
+        }
     }
 
     @GetMapping("/direct-conversations")
@@ -141,5 +162,40 @@ public class MessageController {
             return ResponseEntity.badRequest()
                     .body(new ApiResponse(false, e.getMessage()));
         }
+    }
+
+    @GetMapping("/recent")
+    @PreAuthorize("hasAnyRole('SEEKER', 'LANDLORD')")
+    public ResponseEntity<ApiResponse> getRecentMessages(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(defaultValue = "10") int count) {
+        try {
+            var user = userService.getUserByUsername(userDetails.getUsername())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            List<MessageResponse> messages = messageService.getRecentMessages(user.getId(), count);
+            return ResponseEntity.ok(new ApiResponse(true, "Recent messages retrieved successfully", messages));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse(false, e.getMessage()));
+        }
+    }
+
+    // WebSocket Message Handlers
+    @MessageMapping("/send/message")
+    public void handleWebSocketMessage(@Payload MessageRequest messageRequest,
+                                       @Header("simpUser") Principal principal) {
+        Long senderId = Long.parseLong(principal.getName());
+        messageService.sendAndNotifyMessage(senderId, messageRequest);
+    }
+
+    @SubscribeMapping("/user/queue/messages")
+    public void subscribeToUserMessages(Principal principal) {
+        // Subscription confirmation if needed
+    }
+
+    @SubscribeMapping("/topic/room/{roomId}")
+    public void subscribeToRoom(@DestinationVariable Long roomId, Principal principal) {
+        // Subscription confirmation if needed
     }
 }

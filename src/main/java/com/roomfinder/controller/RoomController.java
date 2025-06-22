@@ -9,6 +9,9 @@ import com.roomfinder.service.RoomService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/rooms")
@@ -46,17 +50,12 @@ public class RoomController {
         // Parse existingImages from JSON string
         List<String> existingImages = new ArrayList<>();
         if (existingImagesJson != null && !existingImagesJson.isEmpty()) {
-            existingImages = objectMapper.readValue(existingImagesJson, new TypeReference<List<String>>() {});
+            existingImages = objectMapper.readValue(existingImagesJson, new TypeReference<List<String>>() {
+            });
         }
 
         Room updatedRoom = roomService.updateRoom(id, request, existingImages, landlordId);
         return ResponseEntity.ok(updatedRoom);
-    }
-
-    @GetMapping
-    public ResponseEntity<List<Room>> getAllRooms() {
-        List<Room> rooms = roomService.getAllRooms();
-        return ResponseEntity.ok(rooms);
     }
 
 
@@ -77,18 +76,24 @@ public class RoomController {
 
 
     @GetMapping("/landlord/{landlordId}")
-    public ResponseEntity<List<Room>> getRoomsByLandlord(@PathVariable Long landlordId) {
-        List<Room> rooms = roomService.getRoomsByLandlord(landlordId);
-        return ResponseEntity.ok(rooms);
+    public ResponseEntity<Page<Room>> getRoomsByLandlord(
+            @PathVariable Long landlordId,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(roomService.getRoomsByLandlord(landlordId, pageable));
+    }
+
+    @GetMapping
+    public ResponseEntity<Page<Room>> getAllRooms(@PageableDefault(size = 5) Pageable pageable) {
+        return ResponseEntity.ok(roomService.getAllRooms(pageable));
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<Room>> searchRooms(
+    public ResponseEntity<Page<Room>> searchRooms(
             @RequestParam(required = false) String city,
             @RequestParam(required = false) Double maxPrice,
-            @RequestParam(required = false) String address) {
-        List<Room> rooms = roomService.searchRooms(city, maxPrice, address);
-        return ResponseEntity.ok(rooms);
+            @RequestParam(required = false) String address,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(roomService.searchRooms(city, maxPrice, address, pageable));
     }
 
 
@@ -96,7 +101,6 @@ public class RoomController {
     public ResponseEntity<?> toggleAvailability(
             @PathVariable Long id,
             @RequestHeader("X-Landlord-Id") Long landlordId) {
-
         try {
             roomService.toggleAvailability(id, landlordId);
             return ResponseEntity.ok().build();
@@ -105,5 +109,16 @@ public class RoomController {
         } catch (AccessDeniedException ex) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());
         }
+    }
+
+    @GetMapping("/recent/new-listings")
+    public ResponseEntity<Page<Room>> getNewListingsLast7Days(
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(roomService.getNewListingsLast7Days(pageable));
+    }
+
+    @GetMapping("/stats/new-listings")
+    public ResponseEntity<Map<String, Object>> getNewListingsStatsLast7Days() {
+        return ResponseEntity.ok(roomService.getNewListingsStatsLast7Days());
     }
 }

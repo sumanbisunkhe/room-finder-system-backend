@@ -9,6 +9,8 @@ import com.roomfinder.repository.BookingRepository;
 import com.roomfinder.service.BookingService;
 import com.roomfinder.service.RoomService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +25,6 @@ public class BookingServiceImpl implements BookingService {
     private final BookingRepository bookingRepository;
     private final RoomService roomService;
 
-
     @Override
     @Transactional
     public Booking createBooking(BookingRequest request, Long seekerId) {
@@ -36,6 +37,7 @@ public class BookingServiceImpl implements BookingService {
         booking.setStartDate(request.getStartDate());
         booking.setEndDate(request.getEndDate());
         booking.setComments(request.getComments());
+        booking.setStatus(BookingStatus.PENDING);
 
         return bookingRepository.save(booking);
     }
@@ -46,7 +48,6 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = getBookingById(bookingId);
         validateBookingStatus(booking, BookingStatus.PENDING);
 
-        // Verify that the landlord owns the room
         if (!roomService.isRoomOwner(booking.getRoomId(), landlordId)) {
             throw new AccessDeniedException("Only the room owner can approve bookings");
         }
@@ -54,6 +55,7 @@ public class BookingServiceImpl implements BookingService {
         validateNoOverlappingBookings(booking.getRoomId(), booking.getStartDate(), booking.getEndDate());
 
         booking.setStatus(BookingStatus.APPROVED);
+        roomService.setAvailability(booking.getRoomId(), landlordId, false);
         return bookingRepository.save(booking);
     }
 
@@ -113,32 +115,132 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    @Transactional
+    public void deleteBooking(Long bookingId, Long userId) {
+        Booking booking = getBookingById(bookingId);
+
+        boolean isSeeker = booking.getSeekerId().equals(userId);
+        boolean isLandlord = roomService.isRoomOwner(booking.getRoomId(), userId);
+
+        if (!isSeeker && !isLandlord) {
+            throw new AccessDeniedException("Only the booking creator or room owner can delete the booking");
+        }
+
+        if (booking.getStatus() == BookingStatus.APPROVED) {
+            throw new InvalidBookingException("Cannot delete an approved booking. Please cancel it first.");
+        }
+
+        bookingRepository.delete(booking);
+    }
+
+    @Override
     public Booking getBookingById(Long bookingId) {
         return bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("Booking not found with id: " + bookingId));
     }
 
     @Override
-    public List<Booking> getBookingsBySeeker(Long seekerId) {
-        return bookingRepository.findBySeekerId(seekerId);
+    public Page<Booking> getBookingsBySeeker(Long seekerId, Pageable pageable) {
+        return bookingRepository.findBySeekerIdOrderByIdDesc(seekerId, pageable);
     }
 
     @Override
-    public List<Booking> getBookingsByRoom(Long roomId) {
-        return bookingRepository.findByRoomId(roomId);
+    public Page<Booking> getBookingsByRoom(Long roomId, Pageable pageable) {
+        return bookingRepository.findByRoomIdOrderByIdDesc(roomId, pageable);
     }
 
     @Override
-    public List<Booking> getPendingBookingsByRoom(Long roomId) {
-        return bookingRepository.findByRoomIdAndStatus(roomId, BookingStatus.PENDING);
+    public Page<Booking> getPendingBookingsByRoom(Long roomId, Pageable pageable) {
+        return bookingRepository.findByRoomIdAndStatusOrderByIdDesc(roomId, BookingStatus.PENDING, pageable);
     }
+
     @Override
-    public List<Booking> getBookingsByLandlord(Long landlordId) {
+    public Page<Booking> getBookingsByLandlord(Long landlordId, Pageable pageable) {
         List<Long> roomIds = roomService.getRoomIdsByLandlordId(landlordId);
         if (roomIds.isEmpty()) {
-            return List.of();
+            return Page.empty();
         }
-        return bookingRepository.findByRoomIdIn(roomIds);
+        return bookingRepository.findByRoomIdInOrderByIdDesc(roomIds, pageable);
+    }
+
+    @Override
+    public Page<Booking> getBookingsByStatus(BookingStatus status, Pageable pageable) {
+        return bookingRepository.findByStatusOrderByIdDesc(status, pageable);
+    }
+
+    @Override
+    public Page<Booking> getBookingsBySeekerAndStatus(Long seekerId, BookingStatus status, Pageable pageable) {
+        return bookingRepository.findBySeekerIdAndStatusOrderByIdDesc(seekerId, status, pageable);
+    }
+
+    @Override
+    public Page<Booking> getBookingsByRoomAndStatus(Long roomId, BookingStatus status, Pageable pageable) {
+        return bookingRepository.findByRoomIdAndStatusOrderByIdDesc(roomId, status, pageable);
+    }
+
+    @Override
+    public Page<Booking> getBookingsByLandlordAndStatus(Long landlordId, BookingStatus status, Pageable pageable) {
+        List<Long> roomIds = roomService.getRoomIdsByLandlordId(landlordId);
+        if (roomIds.isEmpty()) {
+            return Page.empty();
+        }
+        return bookingRepository.findByRoomIdInAndStatusOrderByIdDesc(roomIds, status, pageable);
+    }
+
+    @Override
+    public Page<Booking> getBookingsBySeekerAndRoom(Long seekerId, Long roomId, Pageable pageable) {
+        return bookingRepository.findBySeekerIdAndRoomIdOrderByIdDesc(seekerId, roomId, pageable);
+    }
+
+    @Override
+    public Page<Booking> getBookingsBySeekerAndRoomAndStatus(Long seekerId, Long roomId, BookingStatus status, Pageable pageable) {
+        return bookingRepository.findBySeekerIdAndRoomIdAndStatusOrderByIdDesc(seekerId, roomId, status, pageable);
+    }
+
+    @Override
+    public Page<Booking> searchBookings(
+            Long seekerId,
+            Long roomId,
+            BookingStatus status,
+            LocalDate startDateFrom,
+            LocalDate startDateTo,
+            LocalDate endDateFrom,
+            LocalDate endDateTo,
+            Pageable pageable) {
+        return bookingRepository.searchBookings(
+                seekerId,
+                roomId,
+                status,
+                startDateFrom,
+                startDateTo,
+                endDateFrom,
+                endDateTo,
+                pageable);
+    }
+
+    @Override
+    public Page<Booking> searchBookingsForLandlord(
+            Long landlordId,
+            Long seekerId,
+            BookingStatus status,
+            LocalDate startDateFrom,
+            LocalDate startDateTo,
+            LocalDate endDateFrom,
+            LocalDate endDateTo,
+            Pageable pageable) {
+        List<Long> roomIds = roomService.getRoomIdsByLandlordId(landlordId);
+        if (roomIds.isEmpty()) {
+            return Page.empty();
+        }
+        return bookingRepository.searchBookingsForLandlord(
+                roomIds,
+                seekerId,
+                status,
+                startDateFrom,
+                startDateTo,
+                endDateFrom,
+                endDateTo,
+                pageable);
     }
 
     private void validateBookingDates(LocalDate startDate, LocalDate endDate) {
