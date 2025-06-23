@@ -292,6 +292,58 @@ public class RoomServiceImpl implements RoomService {
         return stats;
     }
 
+    @Override
+    public Map<String, Object> getPropertyStatusStats() {
+        Map<String, Object> stats = new LinkedHashMap<>();
+
+        Long totalProperties = roomRepository.countAllRooms();
+        Long availableProperties = roomRepository.countAvailableRooms();
+        Long occupiedProperties = roomRepository.countOccupiedRooms();
+        Double avgPrice = roomRepository.getAveragePrice();
+
+        stats.put("totalProperties", totalProperties);
+        stats.put("availableProperties", availableProperties);
+        stats.put("occupiedProperties", occupiedProperties);
+        stats.put("occupancyRate", totalProperties == 0 ? 0 :
+                (double) occupiedProperties / totalProperties * 100);
+        stats.put("averagePrice", avgPrice != null ? avgPrice : 0);
+
+        return stats;
+    }
+
+    @Override
+    public Map<String, Long> getPriceRangeDistribution() {
+        List<Object[]> results = roomRepository.countRoomsByPriceRange();
+        Map<String, Long> distribution = new LinkedHashMap<>();
+
+        // Initialize all ranges with 0
+        distribution.put("0-5000", 0L);
+        distribution.put("5000-10000", 0L);
+        distribution.put("10000-15000", 0L);
+        distribution.put("15000-20000", 0L);
+        distribution.put("20000+", 0L);
+
+        // Update with actual values
+        for (Object[] result : results) {
+            distribution.put((String) result[0], (Long) result[1]);
+        }
+
+        return distribution;
+    }
+
+    @Override
+    public Map<String, Long> getCityDistribution() {
+        List<Object[]> results = roomRepository.countRoomsByCity();
+        return results.stream()
+                .collect(Collectors.toMap(
+                        arr -> (String) arr[0],
+                        arr -> (Long) arr[1],
+                        (a, b) -> a,
+                        LinkedHashMap::new
+                ));
+    }
+
+
     private void updateRoomFromRequest(Room room, RoomRequest request) {
         room.setTitle(request.getTitle());
         room.setDescription(request.getDescription());

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.roomfinder.dto.request.RoomRequest;
+import com.roomfinder.dto.response.ApiResponse;
 import com.roomfinder.entity.Room;
 import com.roomfinder.service.RoomService;
 import jakarta.persistence.EntityNotFoundException;
@@ -112,13 +113,44 @@ public class RoomController {
     }
 
     @GetMapping("/recent/new-listings")
-    public ResponseEntity<Page<Room>> getNewListingsLast7Days(
+    public ResponseEntity<ApiResponse> getNewListingsLast7Days(
             @PageableDefault(size = 10) Pageable pageable) {
-        return ResponseEntity.ok(roomService.getNewListingsLast7Days(pageable));
+        Page<Room> rooms = roomService.getNewListingsLast7Days(pageable);
+        return ResponseEntity.ok(
+                new ApiResponse(true, "Recent listings retrieved successfully", rooms)
+        );
     }
 
     @GetMapping("/stats/new-listings")
-    public ResponseEntity<Map<String, Object>> getNewListingsStatsLast7Days() {
-        return ResponseEntity.ok(roomService.getNewListingsStatsLast7Days());
+    public ResponseEntity<ApiResponse> getNewListingsStatsLast7Days() {
+        Map<String, Object> stats = roomService.getNewListingsStatsLast7Days();
+        return ResponseEntity.ok(
+                new ApiResponse(true, "New listings statistics retrieved successfully", stats)
+        );
     }
+    @GetMapping("/stats/property-status")
+    public ResponseEntity<ApiResponse> getPropertyStatusStats() {
+        Map<String, Object> stats = roomService.getPropertyStatusStats();
+        return ResponseEntity.ok(
+                new ApiResponse(true, "Property status statistics retrieved successfully", stats)
+        );
+    }
+
+
+    @GetMapping("/stats/price-distribution")
+    public ResponseEntity<ApiResponse> getPriceRangeDistribution() {
+        Map<String, Long> distribution = roomService.getPriceRangeDistribution();
+        return ResponseEntity.ok(
+                new ApiResponse(true, "Price distribution statistics retrieved successfully", distribution)
+        );
+    }
+
+    @GetMapping("/stats/city-distribution")
+    public ResponseEntity<ApiResponse> getCityDistribution() {
+        Map<String, Long> distribution = roomService.getCityDistribution();
+        return ResponseEntity.ok(
+                new ApiResponse(true, "City distribution statistics retrieved successfully", distribution)
+        );
+    }
+
 }

@@ -43,4 +43,11 @@ public interface RoomService {
 
     Map<String, Object> getNewListingsStatsLast7Days();
 
+    Map<String, Object> getPropertyStatusStats();
+
+    Map<String, Long> getPriceRangeDistribution();
+
+    Map<String, Long> getCityDistribution();
+
+
 }

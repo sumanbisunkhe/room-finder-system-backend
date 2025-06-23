@@ -49,19 +49,31 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     @Query("SELECT COUNT(r) FROM Room r WHERE r.available = false")
     Long countOccupiedRooms();
 
-    @Query("SELECT " +
-            "CASE " +
-            "WHEN r.price < 500 THEN '0-500' " +
-            "WHEN r.price >= 500 AND r.price < 1000 THEN '500-1000' " +
-            "WHEN r.price >= 1000 AND r.price < 1500 THEN '1000-1500' " +
-            "WHEN r.price >= 1500 AND r.price < 2000 THEN '1500-2000' " +
-            "ELSE '2000+' " +
-            "END as priceRange, " +
-            "COUNT(r) as count " +
-            "FROM Room r " +
-            "GROUP BY priceRange " +
-            "ORDER BY priceRange")
+    @Query("SELECT AVG(r.price) FROM Room r")
+    Double getAveragePrice();
+
+    @Query("""
+                SELECT 
+                    CASE
+                        WHEN r.price < 5000 THEN '0-5000'
+                        WHEN r.price >= 5000 AND r.price < 10000 THEN '5000-10000'
+                        WHEN r.price >= 10000 AND r.price < 15000 THEN '10000-15000'
+                        WHEN r.price >= 15000 AND r.price < 20000 THEN '15000-20000'
+                        ELSE '20000+'
+                    END AS priceRange,
+                    COUNT(r) AS count
+                FROM Room r
+                GROUP BY 
+                    CASE
+                        WHEN r.price < 5000 THEN '0-5000'
+                        WHEN r.price >= 5000 AND r.price < 10000 THEN '5000-10000'
+                        WHEN r.price >= 10000 AND r.price < 15000 THEN '10000-15000'
+                        WHEN r.price >= 15000 AND r.price < 20000 THEN '15000-20000'
+                        ELSE '20000+'
+                    END
+            """)
     List<Object[]> countRoomsByPriceRange();
+
 
     @Query("SELECT r.city, COUNT(r) as count FROM Room r GROUP BY r.city ORDER BY count DESC")
     List<Object[]> countRoomsByCity();
