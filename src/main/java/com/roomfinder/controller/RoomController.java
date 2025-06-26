@@ -69,6 +69,7 @@ public class RoomController {
     }
 
 
+
     @GetMapping("/{id}")
     public ResponseEntity<Room> getRoom(@PathVariable Long id) {
         Room room = roomService.getRoomById(id);
